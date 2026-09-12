@@ -126,6 +126,115 @@ class CustomerSoftDeleteTest extends TestCase
         Storage::disk('public')->assertMissing($path);
     }
 
+    public function test_restore_unknown_id_flashes_error(): void
+    {
+        $response = $this->patch(route('customers.restore', 999999));
+
+        $response
+            ->assertRedirect(route('customers.trash'))
+            ->assertSessionHas('error', __('customers.flash.restore_failed'));
+    }
+
+    public function test_force_destroy_unknown_id_returns_not_found(): void
+    {
+        $this->delete(route('customers.force-destroy', 999999))->assertNotFound();
+    }
+
+    public function test_restore_is_blocked_when_active_customer_already_uses_the_email(): void
+    {
+        $email = 'conflito@example.com';
+        $trashed = Customer::factory()->create([
+            'first_name' => 'Lixeira',
+            'last_name' => 'Original',
+            'email' => $email,
+            'phone' => '11911112222',
+            'ban' => '1111111111111111',
+            'about' => 'permanece',
+        ]);
+        $trashed->delete();
+        $active = Customer::factory()->create([
+            'first_name' => 'Ativo',
+            'email' => $email,
+            'phone' => '11933334444',
+        ]);
+
+        $response = $this->patch(route('customers.restore', $trashed->id));
+
+        $response
+            ->assertRedirect(route('customers.trash'))
+            ->assertSessionHas('error', __('customers.flash.restore_email_conflict'));
+
+        $trashed->refresh();
+        $active->refresh();
+
+        $this->assertSoftDeleted('customers', ['id' => $trashed->id]);
+        $this->assertSame('Lixeira', $trashed->first_name);
+        $this->assertSame('Original', $trashed->last_name);
+        $this->assertSame($email, $trashed->email);
+        $this->assertSame('11911112222', $trashed->phone);
+        $this->assertSame('1111111111111111', $trashed->ban);
+        $this->assertSame('permanece', $trashed->about);
+        $this->assertSame('Ativo', $active->first_name);
+        $this->assertSame($email, $active->email);
+        $this->assertNull($active->deleted_at);
+        $this->assertSame(1, Customer::query()->where('email', $email)->count());
+    }
+
+    public function test_restore_uses_the_same_email_comparison_as_unique_validation(): void
+    {
+        $trashed = Customer::factory()->create(['email' => 'Case@example.com']);
+        $trashed->delete();
+        Customer::factory()->create(['email' => 'case@example.com']);
+
+        $response = $this->patch(route('customers.restore', $trashed->id));
+
+        $response
+            ->assertRedirect(route('customers.trash'))
+            ->assertSessionHas('error', __('customers.flash.restore_email_conflict'));
+
+        $this->assertSoftDeleted('customers', ['id' => $trashed->id]);
+    }
+
+    public function test_restore_succeeds_when_only_other_trashed_customers_share_the_email(): void
+    {
+        $email = 'so-lixeira@example.com';
+        $first = Customer::factory()->create(['email' => $email, 'first_name' => 'Primeiro']);
+        $second = Customer::factory()->create(['email' => $email, 'first_name' => 'Segundo']);
+        $first->delete();
+        $second->delete();
+
+        $response = $this->patch(route('customers.restore', $first->id));
+
+        $response
+            ->assertRedirect(route('customers.trash'))
+            ->assertSessionHas('success', __('customers.flash.restored'));
+
+        $this->assertDatabaseHas('customers', ['id' => $first->id, 'deleted_at' => null]);
+        $this->assertSoftDeleted('customers', ['id' => $second->id]);
+    }
+
+    public function test_restore_succeeds_after_active_email_conflict_is_resolved(): void
+    {
+        $email = 'depois@example.com';
+        $trashed = Customer::factory()->create(['email' => $email, 'first_name' => 'Lixeira']);
+        $trashed->delete();
+        $active = Customer::factory()->create(['email' => $email, 'first_name' => 'Ativo']);
+
+        $this->put(route('customers.update', $active), $this->validCustomerPayload([
+            'first_name' => 'Ativo',
+            'email' => 'livre@example.com',
+        ]))->assertRedirect(route('customers.show', $active));
+
+        $response = $this->patch(route('customers.restore', $trashed->id));
+
+        $response
+            ->assertRedirect(route('customers.trash'))
+            ->assertSessionHas('success', __('customers.flash.restored'));
+
+        $this->assertDatabaseHas('customers', ['id' => $trashed->id, 'deleted_at' => null, 'email' => $email]);
+        $this->assertDatabaseHas('customers', ['id' => $active->id, 'email' => 'livre@example.com', 'deleted_at' => null]);
+    }
+
     public function test_new_customer_can_use_email_after_soft_delete(): void
     {
         $email = 'reused@example.com';

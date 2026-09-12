@@ -56,7 +56,7 @@
     <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div class="flex flex-wrap items-center gap-6 bg-gray-600 px-6 py-6">
             <x-profile-avatar
-                :src="$customer->image ? asset('storage/' . $customer->image) : null"
+                :src="$customer->imageUrl()"
                 :alt="$customer->full_name"
                 :size="112"
                 variant="header"

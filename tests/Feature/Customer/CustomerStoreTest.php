@@ -115,6 +115,69 @@ class CustomerStoreTest extends TestCase
         $this->assertDatabaseCount('customers', 0);
     }
 
+    public function test_store_accepts_about_at_max_length(): void
+    {
+        $payload = $this->validCustomerPayload([
+            'email' => 'about-limite@example.com',
+            'about' => str_repeat('a', 1000),
+        ]);
+
+        $response = $this->post(route('customers.store'), $payload);
+
+        $customer = Customer::query()->where('email', 'about-limite@example.com')->first();
+
+        $this->assertNotNull($customer);
+        $this->assertSame(1000, strlen((string) $customer->about));
+        $response->assertRedirect(route('customers.show', $customer));
+    }
+
+    public function test_store_accepts_phone_at_max_length(): void
+    {
+        $payload = $this->validCustomerPayload([
+            'email' => 'phone-limite@example.com',
+            'phone' => str_repeat('1', 20),
+        ]);
+
+        $response = $this->post(route('customers.store'), $payload);
+
+        $customer = Customer::query()->where('email', 'phone-limite@example.com')->first();
+
+        $this->assertNotNull($customer);
+        $this->assertSame(str_repeat('1', 20), $customer->getAttributes()['phone']);
+        $response->assertRedirect(route('customers.show', $customer));
+    }
+
+    public function test_store_validation_fails_when_phone_exceeds_max_length(): void
+    {
+        $response = $this->from(route('customers.create'))
+            ->post(route('customers.store'), $this->validCustomerPayload([
+                'phone' => str_repeat('1', 21),
+            ]));
+
+        $response
+            ->assertRedirect(route('customers.create'))
+            ->assertSessionHasErrors(['phone']);
+
+        $this->assertDatabaseCount('customers', 0);
+    }
+
+    public function test_store_validation_fails_when_image_exceeds_max_size(): void
+    {
+        Storage::fake('public');
+
+        $response = $this->from(route('customers.create'))
+            ->post(route('customers.store'), [
+                ...$this->validCustomerPayload(),
+                'image' => $this->fakeCustomerImage('grande.jpg')->size(2049),
+            ]);
+
+        $response
+            ->assertRedirect(route('customers.create'))
+            ->assertSessionHasErrors(['image']);
+
+        $this->assertDatabaseCount('customers', 0);
+    }
+
     public function test_store_validation_fails_when_about_exceeds_max_length(): void
     {
         $response = $this->from(route('customers.create'))

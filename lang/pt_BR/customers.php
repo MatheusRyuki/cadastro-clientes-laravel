@@ -89,6 +89,7 @@ return [
         'restored' => 'Cliente restaurado com sucesso.',
         'force_deleted' => 'Cliente excluído permanentemente.',
         'restore_failed' => 'Não foi possível restaurar o cliente. Ele pode já ter sido restaurado.',
+        'restore_email_conflict' => 'Não foi possível restaurar: já existe um cliente ativo com esse e-mail.',
         'bulk_restored' => ':count cliente(s) restaurado(s) com sucesso.',
         'bulk_force_deleted' => ':count cliente(s) excluído(s) permanentemente.',
         'bulk_none_selected' => 'Nenhum cliente selecionado.',

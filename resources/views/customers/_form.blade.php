@@ -42,7 +42,7 @@
     @if ($customer?->image)
         <div class="mb-3" x-show="!preview">
             <x-profile-avatar
-                :src="asset('storage/' . $customer->image)"
+                :src="$customer->imageUrl()"
                 :alt="__('customers.image.current_alt', ['name' => $customer->full_name])"
                 :size="96"
                 variant="form"

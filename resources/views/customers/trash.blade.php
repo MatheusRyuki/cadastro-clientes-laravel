@@ -146,7 +146,7 @@
                             <td class="whitespace-nowrap px-6 py-4">
                                 <div class="flex items-center gap-3">
                                     <x-profile-avatar
-                                        :src="$customer->image ? asset('storage/' . $customer->image) : null"
+                                        :src="$customer->imageUrl()"
                                         :alt="$customer->full_name"
                                         :size="40"
                                         variant="form"
@@ -189,7 +189,7 @@
                             @change="toggle({{ $customer->id }})"
                         >
                         <x-profile-avatar
-                            :src="$customer->image ? asset('storage/' . $customer->image) : null"
+                            :src="$customer->imageUrl()"
                             :alt="$customer->full_name"
                             :size="48"
                             variant="form"

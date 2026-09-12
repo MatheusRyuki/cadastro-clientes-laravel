@@ -79,6 +79,27 @@ class CustomerTrashTest extends TestCase
         $this->assertDatabaseHas('customers', ['id' => $second->id, 'deleted_at' => null]);
     }
 
+    public function test_bulk_restore_skips_customers_whose_email_is_taken_by_an_active_customer(): void
+    {
+        $conflicting = Customer::factory()->create(['email' => 'bulk-conflito@example.com', 'first_name' => 'Conflito']);
+        $free = Customer::factory()->create(['email' => 'bulk-livre@example.com', 'first_name' => 'Livre']);
+        $conflicting->delete();
+        $free->delete();
+        $active = Customer::factory()->create(['email' => 'bulk-conflito@example.com', 'first_name' => 'Ativo']);
+
+        $response = $this->post(route('customers.bulk-restore'), [
+            'ids' => [$conflicting->id, $free->id],
+        ]);
+
+        $response
+            ->assertRedirect(route('customers.trash'))
+            ->assertSessionHas('success', __('customers.flash.bulk_restored', ['count' => 1]));
+
+        $this->assertSoftDeleted('customers', ['id' => $conflicting->id]);
+        $this->assertDatabaseHas('customers', ['id' => $free->id, 'deleted_at' => null]);
+        $this->assertDatabaseHas('customers', ['id' => $active->id, 'email' => 'bulk-conflito@example.com', 'deleted_at' => null]);
+    }
+
     public function test_bulk_restore_without_matching_ids_flashes_error(): void
     {
         $active = Customer::factory()->create();

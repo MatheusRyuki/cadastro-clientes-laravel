@@ -123,6 +123,10 @@ class CustomerController extends Controller
             return $this->redirectToTrash('error', 'customers.flash.restore_failed');
         }
 
+        if ($this->emailTakenByActiveCustomer((string) $customer->email)) {
+            return $this->redirectToTrash('error', 'customers.flash.restore_email_conflict');
+        }
+
         $customer->restore();
 
         return $this->redirectToTrash('success', 'customers.flash.restored');
@@ -146,15 +150,28 @@ class CustomerController extends Controller
             return $this->redirectToTrash('error', 'customers.flash.bulk_none_selected');
         }
 
-        $count = Customer::onlyTrashed()->whereIn('id', $ids)->count();
+        $candidates = Customer::onlyTrashed()->whereIn('id', $ids)->get();
 
-        if ($count === 0) {
+        if ($candidates->isEmpty()) {
             return $this->redirectToTrash('error', 'customers.flash.bulk_none_matched');
         }
 
-        Customer::onlyTrashed()->whereIn('id', $ids)->restore();
+        $restored = 0;
 
-        return $this->redirectToTrash('success', 'customers.flash.bulk_restored', ['count' => $count]);
+        foreach ($candidates as $customer) {
+            if ($this->emailTakenByActiveCustomer((string) $customer->email)) {
+                continue;
+            }
+
+            $customer->restore();
+            $restored++;
+        }
+
+        if ($restored === 0) {
+            return $this->redirectToTrash('error', 'customers.flash.restore_email_conflict');
+        }
+
+        return $this->redirectToTrash('success', 'customers.flash.bulk_restored', ['count' => $restored]);
     }
 
     public function bulkForceDestroy(Request $request): RedirectResponse
@@ -210,6 +227,11 @@ class CustomerController extends Controller
         }
 
         return $query->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc');
+    }
+
+    private function emailTakenByActiveCustomer(string $email): bool
+    {
+        return Customer::query()->where('email', $email)->exists();
     }
 
     private function applySearchFilter(Builder $query, string $term): Builder

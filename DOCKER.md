@@ -50,7 +50,9 @@ Dentro do Docker o host é `mysql`. Do host: `127.0.0.1:3306`.
 - user: `sail`
 - password: `password`
 
-Os testes usam o banco `testing` (criado pelo script do Sail no MySQL).
+Os testes PHP usam o banco `testing` (criado pelo script do Sail no MySQL).
+
+Os testes E2E usam outra instância HTTP na porta **8081** e o banco **`e2e`**, com `php artisan e2e:migrate-fresh` (aborta fora desse banco). Veja o README.
 
 ## Recriar do zero
 

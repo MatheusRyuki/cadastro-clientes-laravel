@@ -3,7 +3,7 @@
 <div class="flex h-full flex-col">
     <div class="flex items-center gap-4 border-b border-gray-200 bg-gray-600 px-6 py-5">
         <x-profile-avatar
-            :src="$customer->image ? asset('storage/' . $customer->image) : null"
+            :src="$customer->imageUrl()"
             :alt="$customer->full_name"
             :size="80"
             variant="header"

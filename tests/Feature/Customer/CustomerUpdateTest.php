@@ -4,6 +4,7 @@ namespace Tests\Feature\Customer;
 
 use App\Models\Customer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\Feature\Customer\Concerns\InteractsWithCustomerPayload;
 use Tests\TestCase;
@@ -106,6 +107,58 @@ class CustomerUpdateTest extends TestCase
         $response
             ->assertRedirect(route('customers.edit', $customer))
             ->assertSessionHasErrors(['about']);
+    }
+
+    public function test_update_keeps_existing_image_when_no_new_file_is_sent(): void
+    {
+        Storage::fake('public');
+
+        $path = 'customers/manter.jpg';
+        Storage::disk('public')->put($path, 'conteudo');
+
+        $customer = Customer::factory()->create([
+            'first_name' => 'Original',
+            'image' => $path,
+        ]);
+
+        $response = $this->put(route('customers.update', $customer), $this->validCustomerPayload([
+            'first_name' => 'Renomeado',
+        ]));
+
+        $customer->refresh();
+
+        $this->assertSame('Renomeado', $customer->first_name);
+        $this->assertSame($path, $customer->image);
+        Storage::disk('public')->assertExists($path);
+        $response->assertRedirect(route('customers.show', $customer));
+    }
+
+    public function test_update_rejects_invalid_image_without_replacing_existing_file(): void
+    {
+        Storage::fake('public');
+
+        $path = 'customers/valida.jpg';
+        Storage::disk('public')->put($path, 'conteudo');
+
+        $customer = Customer::factory()->create([
+            'email' => 'com-foto@example.com',
+            'image' => $path,
+        ]);
+
+        $response = $this->from(route('customers.edit', $customer))
+            ->put(route('customers.update', $customer), [
+                ...$this->validCustomerPayload(['email' => 'com-foto@example.com']),
+                'image' => UploadedFile::fake()->create('malware.exe', 20, 'application/octet-stream'),
+            ]);
+
+        $response
+            ->assertRedirect(route('customers.edit', $customer))
+            ->assertSessionHasErrors(['image']);
+
+        $customer->refresh();
+        $this->assertSame($path, $customer->image);
+        $this->assertSame('com-foto@example.com', $customer->email);
+        Storage::disk('public')->assertExists($path);
     }
 
     public function test_update_replaces_existing_image_and_deletes_old_file(): void
